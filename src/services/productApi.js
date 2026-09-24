@@ -1,36 +1,51 @@
 import apiClient from '../lib/axios'
 
-export const getProducts = async ({ limit = 10, skip = 0, signal } = {}) => {
+/**
+ * Product API Services
+ * Separated from UI components with signal support for AbortController
+ * and delay parameter support for race condition testing.
+ */
+
+export const getProducts = async ({ limit = 10, skip = 0, delay, signal } = {}) => {
+  const params = { limit, skip }
+  if (delay) params.delay = delay
+
   const { data } = await apiClient.get('/products', {
-    params: { limit, skip },
+    params,
     signal,
   })
   return data
 }
 
-export const searchProducts = async ({ q, limit = 10, skip = 0, signal }) => {
+export const searchProducts = async ({ q, limit = 10, skip = 0, delay, signal } = {}) => {
+  const params = { q, limit, skip }
+  if (delay) params.delay = delay
+
   const { data } = await apiClient.get('/products/search', {
-    params: { q, limit, skip },
+    params,
     signal,
   })
   return data
 }
 
-export const getCategories = async () => {
-  const { data } = await apiClient.get('/products/categories')
+export const getCategories = async ({ signal } = {}) => {
+  const { data } = await apiClient.get('/products/categories', { signal })
   return data
 }
 
-export const getProductsByCategory = async ({ category, limit = 10, skip = 0, signal }) => {
+export const getProductsByCategory = async ({ category, limit = 10, skip = 0, delay, signal } = {}) => {
+  const params = { limit, skip }
+  if (delay) params.delay = delay
+
   const { data } = await apiClient.get(`/products/category/${category}`, {
-    params: { limit, skip },
+    params,
     signal,
   })
   return data
 }
 
-export const getProductById = async (id) => {
-  const { data } = await apiClient.get(`/products/${id}`)
+export const getProductById = async (id, { signal } = {}) => {
+  const { data } = await apiClient.get(`/products/${id}`, { signal })
   return data
 }
 
