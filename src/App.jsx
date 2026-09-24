@@ -2,6 +2,8 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import LoginPage from './pages/LoginPage'
 import ProductsPage from './pages/ProductsPage'
+import ProtectedRoute from './components/auth/ProtectedRoute'
+import Layout from './components/layout/Layout'
 import { Toaster } from 'react-hot-toast'
 
 export default function App() {
@@ -22,9 +24,19 @@ export default function App() {
           }}
         />
         <Routes>
+          {/* Public Route */}
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/products" element={<ProductsPage />} />
-          <Route path="*" element={<Navigate to="/login" replace />} />
+
+          {/* Protected Routes nested in Layout */}
+          <Route element={<ProtectedRoute />}>
+            <Route element={<Layout />}>
+              <Route path="/products" element={<ProductsPage />} />
+            </Route>
+          </Route>
+
+          {/* Fallback & Redirect */}
+          <Route path="/" element={<Navigate to="/products" replace />} />
+          <Route path="*" element={<Navigate to="/products" replace />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
