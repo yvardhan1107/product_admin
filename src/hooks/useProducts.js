@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   getProducts,
   searchProducts,
@@ -11,25 +12,28 @@ import axios from 'axios'
 import toast from 'react-hot-toast'
 
 /**
- * Custom hook to manage product fetching, pagination, debounced search,
- * category filtering, client-side sorting, and race-condition prevention.
+ * Custom hook to synchronize dashboard state with URL search params.
+ * Enables shareable URLs, bookmarking, and page-refresh state preservation.
  */
 export function useProducts() {
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  // Read initial values from URL query parameters
+  const urlPage = parseInt(searchParams.get('page') || '1', 10) || 1
+  const urlLimit = parseInt(searchParams.get('limit') || '10', 10) || 10
+  const urlSearch = searchParams.get('search') || ''
+  const urlCategory = searchParams.get('category') || ''
+  const urlSort = searchParams.get('sort') || ''
+
   const [rawProducts, setRawProducts] = useState([])
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [total, setTotal] = useState(0)
 
-  // Pagination states
-  const [page, setPage] = useState(1)
-  const [limit, setLimit] = useState(10)
-
-  // Filter & Search states
-  const [searchQuery, setSearchQuery] = useState('')
-  const debouncedSearch = useDebounce(searchQuery, 400)
-  const [selectedCategory, setSelectedCategory] = useState('')
-  const [sortBy, setSortBy] = useState('')
+  // Local state for immediate typing responsiveness in the input box
+  const [searchInput, setSearchInput] = useState(urlSearch)
+  const debouncedSearch = useDebounce(searchInput, 400)
 
   // Test mode: Simulate network delay (&delay=2000) for evaluator verification
   const [simulateLatency, setSimulateLatency] = useState(false)
@@ -52,34 +56,97 @@ export function useProducts() {
     }
   }, [])
 
-  // Handle Search vs Category mutual exclusivity
-  // Assignment rule: DummyJSON cannot search and category filter simultaneously.
-  const handleSearchChange = useCallback((value) => {
-    setSearchQuery(value)
-    if (value.trim()) {
-      setSelectedCategory('') // Clear category when user searches
-    }
-  }, [])
-
-  const handleCategoryChange = useCallback((cat) => {
-    setSelectedCategory(cat)
-    if (cat) {
-      setSearchQuery('') // Clear search when user selects category
-    }
-    setPage(1)
-  }, [])
-
-  // Reset page to 1 whenever search query changes
+  // Sync debounced search input back to URL params
   useEffect(() => {
-    setPage(1)
-  }, [debouncedSearch])
+    // Only update if debounced value is different from current URL param
+    if (debouncedSearch !== urlSearch) {
+      const nextParams = new URLSearchParams(searchParams)
 
-  // Reset page to 1 whenever sort changes
+      if (debouncedSearch.trim()) {
+        nextParams.set('search', debouncedSearch.trim())
+        nextParams.delete('category') // Mutual exclusivity: search clears category
+      } else {
+        nextParams.delete('search')
+      }
+
+      nextParams.set('page', '1') // Reset to page 1 on search change
+      setSearchParams(nextParams, { replace: true })
+    }
+  }, [debouncedSearch, urlSearch, searchParams, setSearchParams])
+
+  // Sync URL search back to input state if URL changed externally (e.g. browser back/forward)
   useEffect(() => {
-    setPage(1)
-  }, [sortBy])
+    setSearchInput(urlSearch)
+  }, [urlSearch])
 
-  // Fetch logic with AbortController lifecycle
+  // Helper function to update URL search parameters
+  const updateUrlParams = useCallback(
+    (updates) => {
+      const nextParams = new URLSearchParams(searchParams)
+
+      Object.entries(updates).forEach(([key, value]) => {
+        if (value === undefined || value === null || value === '' || (key === 'page' && value === 1)) {
+          nextParams.delete(key)
+        } else {
+          nextParams.set(key, String(value))
+        }
+      })
+
+      setSearchParams(nextParams, { replace: true })
+    },
+    [searchParams, setSearchParams]
+  )
+
+  // Category change handler
+  const handleCategoryChange = useCallback(
+    (cat) => {
+      const nextParams = new URLSearchParams(searchParams)
+      if (cat) {
+        nextParams.set('category', cat)
+        nextParams.delete('search') // Mutual exclusivity: category clears search
+        setSearchInput('')
+      } else {
+        nextParams.delete('category')
+      }
+      nextParams.set('page', '1')
+      setSearchParams(nextParams, { replace: true })
+    },
+    [searchParams, setSearchParams]
+  )
+
+  // Sort change handler
+  const handleSortChange = useCallback(
+    (sortValue) => {
+      updateUrlParams({ sort: sortValue, page: 1 })
+    },
+    [updateUrlParams]
+  )
+
+  // Page change handler
+  const handlePageChange = useCallback(
+    (newPage) => {
+      updateUrlParams({ page: newPage })
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    },
+    [updateUrlParams]
+  )
+
+  // Page size change handler
+  const handlePageSizeChange = useCallback(
+    (newLimit) => {
+      updateUrlParams({ limit: newLimit, page: 1 })
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    },
+    [updateUrlParams]
+  )
+
+  // Clear search handler
+  const handleClearSearch = useCallback(() => {
+    setSearchInput('')
+    updateUrlParams({ search: '', page: 1 })
+  }, [updateUrlParams])
+
+  // Fetch logic with AbortController driven by URL parameters
   useEffect(() => {
     const controller = new AbortController()
     const currentRequestId = ++latestRequestId.current
@@ -89,43 +156,42 @@ export function useProducts() {
       setError(null)
 
       try {
-        const skip = calculateSkip(page, limit)
+        const skip = calculateSkip(urlPage, urlLimit)
         const delay = simulateLatency ? 2000 : 0
         let data
 
-        if (debouncedSearch.trim()) {
+        if (urlSearch.trim()) {
           data = await searchProducts({
-            q: debouncedSearch.trim(),
-            limit,
+            q: urlSearch.trim(),
+            limit: urlLimit,
             skip,
             delay,
             signal: controller.signal,
           })
-        } else if (selectedCategory) {
+        } else if (urlCategory) {
           data = await getProductsByCategory({
-            category: selectedCategory,
-            limit,
+            category: urlCategory,
+            limit: urlLimit,
             skip,
             delay,
             signal: controller.signal,
           })
         } else {
           data = await getProducts({
-            limit,
+            limit: urlLimit,
             skip,
             delay,
             signal: controller.signal,
           })
         }
 
-        // Only update state if this is still the freshest request
         if (currentRequestId === latestRequestId.current) {
           setRawProducts(data.products || [])
           setTotal(data.total || 0)
         }
       } catch (err) {
         if (axios.isCancel(err) || err.name === 'CanceledError' || err.code === 'ERR_CANCELED') {
-          console.debug(`[Stale Request Guard] Aborted outdated request #${currentRequestId}`)
+          console.debug(`[Stale Request Guard] Aborted request #${currentRequestId}`)
           return
         }
 
@@ -146,14 +212,14 @@ export function useProducts() {
     return () => {
       controller.abort()
     }
-  }, [page, limit, debouncedSearch, selectedCategory, simulateLatency])
+  }, [urlPage, urlLimit, urlSearch, urlCategory, simulateLatency])
 
   // Apply Client-Side Sorting on current batch
   const products = useMemo(() => {
-    if (!sortBy || !rawProducts.length) return rawProducts
+    if (!urlSort || !rawProducts.length) return rawProducts
 
     const sorted = [...rawProducts]
-    switch (sortBy) {
+    switch (urlSort) {
       case 'price-asc':
         return sorted.sort((a, b) => Number(a.price) - Number(b.price))
       case 'price-desc':
@@ -169,23 +235,7 @@ export function useProducts() {
       default:
         return sorted
     }
-  }, [rawProducts, sortBy])
-
-  const handlePageChange = useCallback((newPage) => {
-    setPage(newPage)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }, [])
-
-  const handlePageSizeChange = useCallback((newLimit) => {
-    setLimit(newLimit)
-    setPage(1)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }, [])
-
-  const handleClearSearch = useCallback(() => {
-    setSearchQuery('')
-    setPage(1)
-  }, [])
+  }, [rawProducts, urlSort])
 
   return {
     products,
@@ -193,19 +243,23 @@ export function useProducts() {
     loading,
     error,
     total,
-    page,
-    limit,
-    searchQuery,
-    setSearchQuery: handleSearchChange,
-    selectedCategory,
+    page: urlPage,
+    limit: urlLimit,
+    searchQuery: searchInput,
+    setSearchQuery: setSearchInput,
+    selectedCategory: urlCategory,
     setSelectedCategory: handleCategoryChange,
-    sortBy,
-    setSortBy,
+    sortBy: urlSort,
+    setSortBy: handleSortChange,
     simulateLatency,
     setSimulateLatency,
     handlePageChange,
     handlePageSizeChange,
     handleClearSearch,
-    refresh: () => setPage((p) => p),
+    refresh: () => {
+      // Re-trigger fetch by cycling state
+      const nextParams = new URLSearchParams(searchParams)
+      setSearchParams(nextParams, { replace: true })
+    },
   }
 }
