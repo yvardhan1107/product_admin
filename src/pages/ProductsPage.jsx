@@ -1,58 +1,107 @@
-import { useAuth } from '../context/AuthContext'
-import { Package, ShieldCheck, KeyRound, Sparkles } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { getProducts } from '../services/productApi'
+import ProductList from '../components/products/ProductList'
+import { ProductTableSkeleton, ProductCardSkeleton } from '../components/ui/Skeleton'
+import { Package, Plus, Sparkles, RefreshCw, AlertCircle } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import toast from 'react-hot-toast'
 
 export default function ProductsPage() {
-  const { user } = useAuth()
+  const [products, setProducts] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [total, setTotal] = useState(0)
+
+  const navigate = useNavigate()
+
+  const loadProducts = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await getProducts({ limit: 10, skip: 0 })
+      setProducts(data.products || [])
+      setTotal(data.total || 0)
+    } catch (err) {
+      console.error('Failed to load products', err)
+      setError('Could not fetch products from the server. Please try again.')
+      toast.error('Failed to fetch products')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadProducts()
+  }, [])
 
   return (
     <div className="space-y-6">
-      {/* Top Banner / Welcome Card */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 p-6 sm:p-8 text-white shadow-lg shadow-blue-500/15">
-        {/* Subtle decorative circles */}
-        <div className="absolute -top-12 -right-12 w-48 h-48 bg-white/10 rounded-full blur-2xl pointer-events-none" />
-        <div className="absolute -bottom-12 -left-12 w-48 h-48 bg-indigo-500/20 rounded-full blur-2xl pointer-events-none" />
-
-        <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 backdrop-blur text-xs font-semibold tracking-wide uppercase text-blue-100 mb-3 border border-white/20">
-              <Sparkles className="w-3.5 h-3.5" />
-              Protected Dashboard
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-              Products Overview
-            </h1>
-            <p className="mt-1 text-sm text-blue-100 max-w-xl">
-              Manage your catalog, inventory levels, pricing, and live customer reviews with DummyJSON API.
-            </p>
+      {/* Top Banner / Actions Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs">
+        <div>
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold mb-2">
+            <Sparkles className="w-3.5 h-3.5" />
+            Live Catalog ({total} products)
           </div>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+            Products Directory
+          </h1>
+          <p className="text-sm text-slate-500 mt-0.5">
+            Manage your store inventory, prices, ratings, and stock status
+          </p>
+        </div>
 
-          <div className="flex items-center gap-3 bg-white/10 backdrop-blur px-4 py-3 rounded-xl border border-white/15">
-            <div className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center text-white">
-              <ShieldCheck className="w-6 h-6 text-emerald-300" />
-            </div>
-            <div className="text-left text-xs">
-              <p className="font-semibold text-white">Authenticated Session</p>
-              <p className="text-blue-200">User: {user?.username || 'emilys'}</p>
-            </div>
-          </div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={loadProducts}
+            disabled={loading}
+            className="p-2.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl border border-slate-200 transition-colors disabled:opacity-50 cursor-pointer"
+            title="Refresh Products"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+          <button
+            onClick={() => navigate('/products/new')}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-white font-medium text-sm bg-blue-600 hover:bg-blue-700 shadow-sm shadow-blue-500/20 active:scale-95 transition-all cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add Product</span>
+          </button>
         </div>
       </div>
 
-      {/* Info card previewing next step */}
-      <div className="bg-white border border-slate-200/80 rounded-2xl p-8 shadow-sm text-center max-w-2xl mx-auto">
-        <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center mx-auto mb-4 border border-blue-100">
-          <KeyRound className="w-6 h-6" />
+      {/* Content Area */}
+      {loading ? (
+        <div>
+          <div className="hidden md:block">
+            <ProductTableSkeleton count={8} />
+          </div>
+          <div className="md:hidden">
+            <ProductCardSkeleton count={4} />
+          </div>
         </div>
-        <h2 className="text-xl font-bold text-slate-900 mb-2">
-          Route Protection Confirmed
-        </h2>
-        <p className="text-sm text-slate-500 mb-6">
-          Unauthenticated visitors cannot access this page. Requests have the JWT access token attached through Axios interceptors.
-        </p>
-        <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs font-mono text-slate-600 overflow-x-auto text-left">
-          <code>Authorization: Bearer {localStorage.getItem('accessToken')?.substring(0, 36)}...</code>
+      ) : error ? (
+        <div className="bg-rose-50 border border-rose-200 rounded-2xl p-8 text-center">
+          <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-2xl flex items-center justify-center mx-auto mb-3">
+            <AlertCircle className="w-6 h-6" />
+          </div>
+          <h3 className="text-base font-bold text-rose-900">Failed to load products</h3>
+          <p className="text-xs text-rose-600 mt-1 max-w-sm mx-auto">{error}</p>
+          <button
+            onClick={loadProducts}
+            className="mt-4 px-4 py-2 rounded-xl text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white shadow-xs transition-colors cursor-pointer"
+          >
+            Try Again
+          </button>
         </div>
-      </div>
+      ) : (
+        <ProductList
+          products={products}
+          onDelete={(product) => {
+            toast(`Delete clicked for: ${product.title}`)
+          }}
+        />
+      )}
     </div>
   )
 }
