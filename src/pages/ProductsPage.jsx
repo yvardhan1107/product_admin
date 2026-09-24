@@ -1,123 +1,32 @@
-import { useState, useEffect, useRef } from 'react'
-import { getProducts, searchProducts } from '../services/productApi'
+import { useProducts } from '../hooks/useProducts'
 import ProductList from '../components/products/ProductList'
 import Pagination from '../components/products/Pagination'
 import SearchBar from '../components/products/SearchBar'
 import { ProductTableSkeleton, ProductCardSkeleton } from '../components/ui/Skeleton'
-import { calculateSkip } from '../utils/pagination'
-import { useDebounce } from '../hooks/useDebounce'
 import { Plus, Sparkles, RefreshCw, AlertCircle, X, Clock, ShieldCheck } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import axios from 'axios'
 import toast from 'react-hot-toast'
 
 export default function ProductsPage() {
-  const [products, setProducts] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const [total, setTotal] = useState(0)
-
-  // Pagination states
-  const [page, setPage] = useState(1)
-  const [limit, setLimit] = useState(10)
-
-  // Search states
-  const [searchQuery, setSearchQuery] = useState('')
-  const debouncedSearch = useDebounce(searchQuery, 400)
-
-  // Evaluator tool: simulate API latency for race-condition testing
-  const [simulateLatency, setSimulateLatency] = useState(false)
-
-  // Request race-condition tracking reference
-  const latestRequestId = useRef(0)
+  const {
+    products,
+    loading,
+    error,
+    total,
+    page,
+    limit,
+    searchQuery,
+    setSearchQuery,
+    debouncedSearch,
+    simulateLatency,
+    setSimulateLatency,
+    handlePageChange,
+    handlePageSizeChange,
+    handleClearSearch,
+    refresh,
+  } = useProducts()
 
   const navigate = useNavigate()
-
-  // Reset page to 1 whenever search query changes
-  useEffect(() => {
-    setPage(1)
-  }, [debouncedSearch])
-
-  useEffect(() => {
-    // 1. Create a fresh AbortController for this fetch invocation
-    const controller = new AbortController()
-
-    // 2. Increment request ID to discard any stale responses if cancellation fails
-    const currentRequestId = ++latestRequestId.current
-
-    const fetchProductsData = async () => {
-      setLoading(true)
-      setError(null)
-
-      try {
-        const skip = calculateSkip(page, limit)
-        const delay = simulateLatency ? 2000 : 0
-        let data
-
-        if (debouncedSearch.trim()) {
-          data = await searchProducts({
-            q: debouncedSearch.trim(),
-            limit,
-            skip,
-            delay,
-            signal: controller.signal,
-          })
-        } else {
-          data = await getProducts({
-            limit,
-            skip,
-            delay,
-            signal: controller.signal,
-          })
-        }
-
-        // Only update UI if this is still the newest initiated request
-        if (currentRequestId === latestRequestId.current) {
-          setProducts(data.products || [])
-          setTotal(data.total || 0)
-        }
-      } catch (err) {
-        // Discard canceled request errors without notifying the user
-        if (axios.isCancel(err) || err.name === 'CanceledError' || err.code === 'ERR_CANCELED') {
-          console.log(`[Stale Request Discarded] Request #${currentRequestId} aborted successfully.`)
-          return
-        }
-
-        if (currentRequestId === latestRequestId.current) {
-          console.error('Failed to load products', err)
-          setError('Could not fetch products from the server. Please try again.')
-          toast.error('Failed to fetch products')
-        }
-      } finally {
-        if (currentRequestId === latestRequestId.current && !controller.signal.aborted) {
-          setLoading(false)
-        }
-      }
-    }
-
-    fetchProductsData()
-
-    // 3. Cancel in-flight request when dependencies change or component unmounts
-    return () => {
-      controller.abort()
-    }
-  }, [page, limit, debouncedSearch, simulateLatency])
-
-  const handlePageChange = (newPage) => {
-    setPage(newPage)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
-
-  const handlePageSizeChange = (newLimit) => {
-    setLimit(newLimit)
-    setPage(1)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
-
-  const handleClearSearch = () => {
-    setSearchQuery('')
-    setPage(1)
-  }
 
   return (
     <div className="space-y-6">
@@ -138,7 +47,7 @@ export default function ProductsPage() {
 
         <div className="flex items-center gap-3">
           <button
-            onClick={() => setPage((p) => p)}
+            onClick={refresh}
             disabled={loading}
             className="p-2.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl border border-slate-200 transition-colors disabled:opacity-50 cursor-pointer"
             title="Refresh Products"
@@ -230,7 +139,7 @@ export default function ProductsPage() {
           <h3 className="text-base font-bold text-rose-900">Failed to load products</h3>
           <p className="text-xs text-rose-600 mt-1 max-w-sm mx-auto">{error}</p>
           <button
-            onClick={() => setPage((p) => p)}
+            onClick={refresh}
             className="mt-4 px-4 py-2 rounded-xl text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white shadow-xs transition-colors cursor-pointer"
           >
             Try Again
