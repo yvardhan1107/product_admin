@@ -6,24 +6,36 @@ import {
   getCategories,
   getProductsByCategory,
 } from '../services/productApi'
-import { calculateSkip } from '../utils/pagination'
+import { calculateSkip, calculateTotalPages } from '../utils/pagination'
+import {
+  sanitizePage,
+  sanitizeLimit,
+  sanitizeSort,
+  sanitizeSearch,
+} from '../utils/validation'
 import { useDebounce } from './useDebounce'
 import axios from 'axios'
 import toast from 'react-hot-toast'
 
 /**
- * Custom hook to synchronize dashboard state with URL search params.
- * Enables shareable URLs, bookmarking, and page-refresh state preservation.
+ * Custom hook to synchronize dashboard state with URL search params
+ * and defensively sanitize invalid or malicious URL parameters.
  */
 export function useProducts() {
   const [searchParams, setSearchParams] = useSearchParams()
 
-  // Read initial values from URL query parameters
-  const urlPage = parseInt(searchParams.get('page') || '1', 10) || 1
-  const urlLimit = parseInt(searchParams.get('limit') || '10', 10) || 10
-  const urlSearch = searchParams.get('search') || ''
-  const urlCategory = searchParams.get('category') || ''
-  const urlSort = searchParams.get('sort') || ''
+  // 1. Defensively sanitize all URL inputs
+  const rawPage = searchParams.get('page')
+  const rawLimit = searchParams.get('limit')
+  const rawSort = searchParams.get('sort')
+  const rawSearch = searchParams.get('search')
+  const rawCategory = searchParams.get('category')
+
+  const urlPage = sanitizePage(rawPage)
+  const urlLimit = sanitizeLimit(rawLimit)
+  const urlSort = sanitizeSort(rawSort)
+  const urlSearch = sanitizeSearch(rawSearch)
+  const urlCategory = rawCategory ? String(rawCategory).trim() : ''
 
   const [rawProducts, setRawProducts] = useState([])
   const [categories, setCategories] = useState([])
@@ -56,9 +68,30 @@ export function useProducts() {
     }
   }, [])
 
+  // Auto-correct invalid URL parameters (e.g. ?page=abc -> normalize in URL)
+  useEffect(() => {
+    const needsCorrection =
+      (rawPage && String(urlPage) !== rawPage && (rawPage !== '1' || urlPage !== 1)) ||
+      (rawLimit && String(urlLimit) !== rawLimit) ||
+      (rawSort && urlSort !== rawSort)
+
+    if (needsCorrection) {
+      const nextParams = new URLSearchParams(searchParams)
+      if (urlPage > 1) nextParams.set('page', String(urlPage))
+      else nextParams.delete('page')
+
+      if (urlLimit !== 10) nextParams.set('limit', String(urlLimit))
+      else nextParams.delete('limit')
+
+      if (urlSort) nextParams.set('sort', urlSort)
+      else nextParams.delete('sort')
+
+      setSearchParams(nextParams, { replace: true })
+    }
+  }, [rawPage, rawLimit, rawSort, urlPage, urlLimit, urlSort, searchParams, setSearchParams])
+
   // Sync debounced search input back to URL params
   useEffect(() => {
-    // Only update if debounced value is different from current URL param
     if (debouncedSearch !== urlSearch) {
       const nextParams = new URLSearchParams(searchParams)
 
@@ -69,12 +102,12 @@ export function useProducts() {
         nextParams.delete('search')
       }
 
-      nextParams.set('page', '1') // Reset to page 1 on search change
+      nextParams.delete('page') // Reset to page 1 on search change
       setSearchParams(nextParams, { replace: true })
     }
   }, [debouncedSearch, urlSearch, searchParams, setSearchParams])
 
-  // Sync URL search back to input state if URL changed externally (e.g. browser back/forward)
+  // Sync URL search back to input state if URL changed externally
   useEffect(() => {
     setSearchInput(urlSearch)
   }, [urlSearch])
@@ -103,12 +136,12 @@ export function useProducts() {
       const nextParams = new URLSearchParams(searchParams)
       if (cat) {
         nextParams.set('category', cat)
-        nextParams.delete('search') // Mutual exclusivity: category clears search
+        nextParams.delete('search')
         setSearchInput('')
       } else {
         nextParams.delete('category')
       }
-      nextParams.set('page', '1')
+      nextParams.delete('page')
       setSearchParams(nextParams, { replace: true })
     },
     [searchParams, setSearchParams]
@@ -146,7 +179,7 @@ export function useProducts() {
     updateUrlParams({ search: '', page: 1 })
   }, [updateUrlParams])
 
-  // Fetch logic with AbortController driven by URL parameters
+  // Fetch logic with AbortController driven by sanitized URL parameters
   useEffect(() => {
     const controller = new AbortController()
     const currentRequestId = ++latestRequestId.current
@@ -186,8 +219,19 @@ export function useProducts() {
         }
 
         if (currentRequestId === latestRequestId.current) {
+          const fetchedTotal = data.total || 0
+          const maxPages = calculateTotalPages(fetchedTotal, urlLimit)
+
+          // Clamp page if ?page=999 was passed and exceeds total pages
+          if (fetchedTotal > 0 && urlPage > maxPages) {
+            console.warn(`[URL Validation] Clamping out-of-bounds page ${urlPage} to ${maxPages}`)
+            toast(`Page ${urlPage} is out of bounds. Showing page ${maxPages}.`, { icon: 'ℹ️' })
+            updateUrlParams({ page: maxPages })
+            return
+          }
+
           setRawProducts(data.products || [])
-          setTotal(data.total || 0)
+          setTotal(fetchedTotal)
         }
       } catch (err) {
         if (axios.isCancel(err) || err.name === 'CanceledError' || err.code === 'ERR_CANCELED') {
@@ -212,7 +256,7 @@ export function useProducts() {
     return () => {
       controller.abort()
     }
-  }, [urlPage, urlLimit, urlSearch, urlCategory, simulateLatency])
+  }, [urlPage, urlLimit, urlSearch, urlCategory, simulateLatency, updateUrlParams])
 
   // Apply Client-Side Sorting on current batch
   const products = useMemo(() => {
@@ -257,7 +301,6 @@ export function useProducts() {
     handlePageSizeChange,
     handleClearSearch,
     refresh: () => {
-      // Re-trigger fetch by cycling state
       const nextParams = new URLSearchParams(searchParams)
       setSearchParams(nextParams, { replace: true })
     },
