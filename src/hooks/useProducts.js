@@ -13,6 +13,7 @@ import {
   sanitizeSort,
   sanitizeSearch,
 } from '../utils/validation'
+import { useProductMutations } from '../context/ProductContext'
 import { useDebounce } from './useDebounce'
 import axios from 'axios'
 import toast from 'react-hot-toast'
@@ -258,11 +259,17 @@ export function useProducts() {
     }
   }, [urlPage, urlLimit, urlSearch, urlCategory, simulateLatency, updateUrlParams])
 
-  // Apply Client-Side Sorting on current batch
-  const products = useMemo(() => {
-    if (!urlSort || !rawProducts.length) return rawProducts
+  const { applyLocalMutations } = useProductMutations()
 
-    const sorted = [...rawProducts]
+  // Apply Local Mutations (added, updated, deleted) & Client-Side Sorting
+  const products = useMemo(() => {
+    // 1. Overlay local mutations
+    const mutated = applyLocalMutations(rawProducts, urlCategory, urlSearch)
+
+    if (!urlSort || !mutated.length) return mutated
+
+    // 2. Apply sorting
+    const sorted = [...mutated]
     switch (urlSort) {
       case 'price-asc':
         return sorted.sort((a, b) => Number(a.price) - Number(b.price))
@@ -279,7 +286,7 @@ export function useProducts() {
       default:
         return sorted
     }
-  }, [rawProducts, urlSort])
+  }, [rawProducts, urlSort, urlCategory, urlSearch, applyLocalMutations])
 
   return {
     products,
