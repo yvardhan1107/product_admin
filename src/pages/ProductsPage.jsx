@@ -7,7 +7,7 @@ import ProductFilters from '../components/products/ProductFilters'
 import DeleteConfirmModal from '../components/products/DeleteConfirmModal'
 import ErrorState from '../components/ui/ErrorState'
 import { ProductTableSkeleton, ProductCardSkeleton } from '../components/ui/Skeleton'
-import { Plus, Sparkles, RefreshCw, AlertCircle, Clock } from 'lucide-react'
+import { Plus, Sparkles, RefreshCw, AlertCircle } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 
@@ -77,31 +77,6 @@ export default function ProductsPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Latency Simulator Toggle for Evaluator Verification */}
-          <button
-            type="button"
-            onClick={() => {
-              const nextState = !simulateLatency
-              setSimulateLatency(nextState)
-              toast(
-                nextState
-                  ? 'Simulating 2000ms network delay (&delay=2000)'
-                  : 'Network delay simulation disabled',
-                { icon: '⏱️' }
-              )
-            }}
-            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
-              simulateLatency
-                ? 'bg-amber-50 text-amber-700 border-amber-300 shadow-xs'
-                : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-            }`}
-            title="Test race conditions using &delay=2000 as specified in assignment"
-          >
-            <Clock className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">&delay=2000</span>
-            <span>{simulateLatency ? 'Active' : 'Test Mode'}</span>
-          </button>
-
           <button
             onClick={refresh}
             disabled={loading}

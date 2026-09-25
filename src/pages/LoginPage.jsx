@@ -31,9 +31,6 @@ export default function LoginPage() {
             InventoryPro
           </span>
         </div>
-        <div className="text-xs font-medium text-slate-500 bg-white/70 backdrop-blur px-3 py-1.5 rounded-full border border-slate-200">
-          DummyJSON Admin API
-        </div>
       </header>
 
       {/* Main Content Form */}
@@ -43,7 +40,7 @@ export default function LoginPage() {
 
       {/* Footer */}
       <footer className="py-6 text-center text-xs text-slate-400 border-t border-slate-200/50">
-        Product Admin Dashboard &bull; Secured with Axios Interceptor Tokens
+        &copy; 2026 InventoryPro. All rights reserved.
       </footer>
     </div>
   )

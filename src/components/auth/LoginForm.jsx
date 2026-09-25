@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useSubmitGuard } from '../../hooks/useSubmitGuard'
-import { Lock, User, Eye, EyeOff, Loader2, AlertCircle, Sparkles } from 'lucide-react'
+import { Lock, User, Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function LoginForm() {
@@ -13,13 +13,6 @@ export default function LoginForm() {
 
   const { login } = useAuth()
   const navigate = useNavigate()
-
-  // Quick fill helper for testers/evaluators
-  const handleQuickFill = () => {
-    setUsername('emilys')
-    setPassword('emilyspass')
-    setErrorMessage('')
-  }
 
   // Guarded login submission strictly preventing concurrent/repeated requests
   const [executeLogin, loading] = useSubmitGuard(async (userToSubmit, passToSubmit) => {
@@ -154,20 +147,6 @@ export default function LoginForm() {
             )}
           </button>
         </form>
-
-        {/* Demo Credentials Helper Pill */}
-        <div className="mt-6 pt-5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-          <span>Demo credentials ready?</span>
-          <button
-            type="button"
-            onClick={handleQuickFill}
-            disabled={loading}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold transition-colors cursor-pointer"
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            Quick fill (emilys)
-          </button>
-        </div>
       </div>
     </div>
   )
