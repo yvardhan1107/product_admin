@@ -5,6 +5,7 @@ import LoginPage from './pages/LoginPage'
 import ProductsPage from './pages/ProductsPage'
 import ProductDetailPage from './pages/ProductDetailPage'
 import AddProductPage from './pages/AddProductPage'
+import EditProductPage from './pages/EditProductPage'
 import NotFoundPage from './pages/NotFoundPage'
 import ProtectedRoute from './components/auth/ProtectedRoute'
 import Layout from './components/layout/Layout'
@@ -37,6 +38,7 @@ export default function App() {
               <Route element={<Layout />}>
                 <Route path="/products" element={<ProductsPage />} />
                 <Route path="/products/new" element={<AddProductPage />} />
+                <Route path="/products/:id/edit" element={<EditProductPage />} />
                 <Route path="/products/:id" element={<ProductDetailPage />} />
                 <Route path="*" element={<NotFoundPage />} />
               </Route>

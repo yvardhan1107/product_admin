@@ -1,9 +1,12 @@
+import { useState } from 'react'
 import { useProducts } from '../hooks/useProducts'
+import { useProductMutations } from '../context/ProductContext'
 import ProductList from '../components/products/ProductList'
 import Pagination from '../components/products/Pagination'
 import ProductFilters from '../components/products/ProductFilters'
+import DeleteConfirmModal from '../components/products/DeleteConfirmModal'
 import { ProductTableSkeleton, ProductCardSkeleton } from '../components/ui/Skeleton'
-import { Plus, Sparkles, RefreshCw, AlertCircle, Clock, ShieldCheck } from 'lucide-react'
+import { Plus, Sparkles, RefreshCw, AlertCircle, Clock } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 
@@ -30,7 +33,26 @@ export default function ProductsPage() {
     refresh,
   } = useProducts()
 
+  const { deleteProduct } = useProductMutations()
   const navigate = useNavigate()
+
+  // Delete modal state
+  const [productToDelete, setProductToDelete] = useState(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  const handleConfirmDelete = async (productId) => {
+    setIsDeleting(true)
+    try {
+      await deleteProduct(productId)
+      toast.success(`Product "${productToDelete?.title}" deleted successfully`)
+      setProductToDelete(null)
+    } catch (err) {
+      console.error('Failed to delete product', err)
+      toast.error('Failed to delete product. Please try again.')
+    } finally {
+      setIsDeleting(false)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -139,9 +161,7 @@ export default function ProductsPage() {
         <div className="space-y-4">
           <ProductList
             products={products}
-            onDelete={(product) => {
-              toast(`Delete clicked for: ${product.title}`)
-            }}
+            onDelete={(product) => setProductToDelete(product)}
           />
 
           {/* Custom Pagination Component */}
@@ -155,6 +175,15 @@ export default function ProductsPage() {
           />
         </div>
       )}
+
+      {/* Delete Confirmation Popup Modal */}
+      <DeleteConfirmModal
+        isOpen={Boolean(productToDelete)}
+        product={productToDelete}
+        onClose={() => setProductToDelete(null)}
+        onConfirm={handleConfirmDelete}
+        isDeleting={isDeleting}
+      />
     </div>
   )
 }

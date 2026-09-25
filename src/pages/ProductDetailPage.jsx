@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { getProductById } from '../services/productApi'
+import { useProductMutations } from '../context/ProductContext'
 import ProductImages from '../components/products/ProductImages'
 import ProductReviews from '../components/products/ProductReviews'
+import DeleteConfirmModal from '../components/products/DeleteConfirmModal'
 import Badge from '../components/ui/Badge'
 import { Skeleton } from '../components/ui/Skeleton'
 import {
@@ -22,14 +24,25 @@ import toast from 'react-hot-toast'
 export default function ProductDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { getProductWithMutations, isProductDeleted, deleteProduct } = useProductMutations()
 
   const [product, setProduct] = useState(null)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [error, setError] = useState(null)
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   useEffect(() => {
     let isMounted = true
+
+    // If marked as deleted, immediately show 404 Not Found
+    if (isProductDeleted(id)) {
+      setNotFound(true)
+      setLoading(false)
+      return
+    }
+
     const controller = new AbortController()
 
     const fetchDetail = async () => {
@@ -38,9 +51,21 @@ export default function ProductDetailPage() {
       setError(null)
 
       try {
+        // First check if product is in local additions
+        const localCheck = getProductWithMutations({ id: Number(id) })
+        if (localCheck && localCheck.title && localCheck.isLocal) {
+          if (isMounted) {
+            setProduct(localCheck)
+            setLoading(false)
+          }
+          return
+        }
+
         const data = await getProductById(id, { signal: controller.signal })
         if (isMounted) {
-          setProduct(data)
+          // Overlay any local edits made to this product
+          const mutated = getProductWithMutations(data)
+          setProduct(mutated)
         }
       } catch (err) {
         if (!isMounted) return
@@ -289,9 +314,7 @@ export default function ProductDetailPage() {
               </button>
 
               <button
-                onClick={() => {
-                  toast(`Delete triggered for #${product.id} (wired in Delete commit)`)
-                }}
+                onClick={() => setIsDeleteModalOpen(true)}
                 className="inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-semibold text-rose-600 hover:text-white hover:bg-rose-600 border border-rose-200 hover:border-rose-600 transition-all cursor-pointer active:scale-[0.99]"
               >
                 <Trash2 className="w-4 h-4" />
@@ -306,6 +329,27 @@ export default function ProductDetailPage() {
       <div className="bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-8 shadow-xs">
         <ProductReviews reviews={product?.reviews || []} />
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmModal
+        isOpen={isDeleteModalOpen}
+        product={product}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={async (productId) => {
+          setIsDeleting(true)
+          try {
+            await deleteProduct(productId)
+            toast.success(`Product "${product.title}" deleted successfully`)
+            navigate('/products', { replace: true })
+          } catch (err) {
+            console.error('Failed to delete product', err)
+            toast.error('Failed to delete product')
+          } finally {
+            setIsDeleting(false)
+          }
+        }}
+        isDeleting={isDeleting}
+      />
     </div>
   )
 }
