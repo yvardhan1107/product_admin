@@ -1,22 +1,20 @@
 import ProductTable from './ProductTable'
 import ProductCard from './ProductCard'
-import { PackageOpen } from 'lucide-react'
+import EmptyState from '../ui/EmptyState'
 
 export default function ProductList({
   products = [],
   onDelete,
+  onClearFilters,
 }) {
   if (!products.length) {
     return (
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-12 text-center shadow-xs">
-        <div className="w-14 h-14 bg-slate-100 text-slate-400 rounded-2xl flex items-center justify-center mx-auto mb-3">
-          <PackageOpen className="w-7 h-7" />
-        </div>
-        <h3 className="text-base font-bold text-slate-800">No products found</h3>
-        <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-          There are currently no products matching your criteria.
-        </p>
-      </div>
+      <EmptyState
+        title="No products found"
+        description="We couldn't find any products matching your search or active filters. Try searching for something else or clear all filters."
+        actionLabel={onClearFilters ? "Clear All Filters" : undefined}
+        onAction={onClearFilters}
+      />
     )
   }
 

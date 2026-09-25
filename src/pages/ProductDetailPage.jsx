@@ -5,6 +5,7 @@ import { useProductMutations } from '../context/ProductContext'
 import ProductImages from '../components/products/ProductImages'
 import ProductReviews from '../components/products/ProductReviews'
 import DeleteConfirmModal from '../components/products/DeleteConfirmModal'
+import ErrorState from '../components/ui/ErrorState'
 import Badge from '../components/ui/Badge'
 import { Skeleton } from '../components/ui/Skeleton'
 import {
@@ -118,17 +119,11 @@ export default function ProductDetailPage() {
   // Generic Error State
   if (error) {
     return (
-      <div className="bg-rose-50 border border-rose-200 rounded-2xl p-8 text-center max-w-lg mx-auto my-8">
-        <AlertCircle className="w-8 h-8 text-rose-600 mx-auto mb-2" />
-        <h3 className="text-base font-bold text-rose-900">Unable to load details</h3>
-        <p className="text-xs text-rose-600 mt-1">{error}</p>
-        <button
-          onClick={() => window.location.reload()}
-          className="mt-4 px-4 py-2 rounded-xl text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white transition-colors cursor-pointer"
-        >
-          Retry
-        </button>
-      </div>
+      <ErrorState
+        title="Unable to load product details"
+        message={error}
+        onRetry={() => window.location.reload()}
+      />
     )
   }
 

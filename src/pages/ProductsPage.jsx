@@ -5,6 +5,7 @@ import ProductList from '../components/products/ProductList'
 import Pagination from '../components/products/Pagination'
 import ProductFilters from '../components/products/ProductFilters'
 import DeleteConfirmModal from '../components/products/DeleteConfirmModal'
+import ErrorState from '../components/ui/ErrorState'
 import { ProductTableSkeleton, ProductCardSkeleton } from '../components/ui/Skeleton'
 import { Plus, Sparkles, RefreshCw, AlertCircle, Clock } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -144,24 +145,18 @@ export default function ProductsPage() {
           </div>
         </div>
       ) : error ? (
-        <div className="bg-rose-50 border border-rose-200 rounded-2xl p-8 text-center">
-          <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-2xl flex items-center justify-center mx-auto mb-3">
-            <AlertCircle className="w-6 h-6" />
-          </div>
-          <h3 className="text-base font-bold text-rose-900">Failed to load products</h3>
-          <p className="text-xs text-rose-600 mt-1 max-w-sm mx-auto">{error}</p>
-          <button
-            onClick={refresh}
-            className="mt-4 px-4 py-2 rounded-xl text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white shadow-xs transition-colors cursor-pointer"
-          >
-            Try Again
-          </button>
-        </div>
+        <ErrorState
+          title="Failed to load catalog products"
+          message={error}
+          onRetry={refresh}
+          isRetrying={loading}
+        />
       ) : (
         <div className="space-y-4">
           <ProductList
             products={products}
             onDelete={(product) => setProductToDelete(product)}
+            onClearFilters={handleClearSearch}
           />
 
           {/* Custom Pagination Component */}
