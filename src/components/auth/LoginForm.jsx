@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
+import { useSubmitGuard } from '../../hooks/useSubmitGuard'
 import { Lock, User, Eye, EyeOff, Loader2, AlertCircle, Sparkles } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -8,7 +9,6 @@ export default function LoginForm() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [loading, setLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
 
   const { login } = useAuth()
@@ -21,12 +21,26 @@ export default function LoginForm() {
     setErrorMessage('')
   }
 
-  const handleSubmit = async (e) => {
+  // Guarded login submission strictly preventing concurrent/repeated requests
+  const [executeLogin, loading] = useSubmitGuard(async (userToSubmit, passToSubmit) => {
+    try {
+      await login(userToSubmit, passToSubmit)
+      toast.success('Welcome back! Signed in successfully.')
+      navigate('/products', { replace: true })
+    } catch (err) {
+      console.error('Login error:', err)
+      const msg =
+        err.response?.data?.message ||
+        (err.response?.status === 400
+          ? 'Invalid username or password'
+          : 'Unable to connect to login service. Please try again.')
+      setErrorMessage(msg)
+      toast.error(msg)
+    }
+  })
+
+  const handleSubmit = (e) => {
     e.preventDefault()
-
-    // Prevent duplicate requests if already loading
-    if (loading) return
-
     setErrorMessage('')
 
     if (!username.trim()) {
@@ -39,24 +53,7 @@ export default function LoginForm() {
       return
     }
 
-    setLoading(true)
-
-    try {
-      await login(username.trim(), password)
-      toast.success('Welcome back! Signed in successfully.')
-      navigate('/products', { replace: true })
-    } catch (err) {
-      console.error('Login error:', err)
-      const msg =
-        err.response?.data?.message ||
-        (err.response?.status === 400
-          ? 'Invalid username or password'
-          : 'Unable to connect to login service. Please try again.')
-      setErrorMessage(msg)
-      toast.error(msg)
-    } finally {
-      setLoading(false)
-    }
+    executeLogin(username.trim(), password)
   }
 
   return (

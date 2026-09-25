@@ -72,7 +72,9 @@ export default function DeleteConfirmModal({
 
           <button
             type="button"
-            onClick={() => onConfirm(product.id)}
+            onClick={() => {
+              if (!isDeleting) onConfirm(product.id)
+            }}
             disabled={isDeleting}
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-xs font-semibold bg-rose-600 hover:bg-rose-700 shadow-sm shadow-rose-500/25 active:scale-[0.99] transition-all disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
           >

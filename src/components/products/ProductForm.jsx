@@ -32,6 +32,14 @@ export default function ProductForm({
 
   const [errors, setErrors] = useState({})
   const [touched, setTouched] = useState({})
+  const lockRef = useState({ locked: false })[0]
+
+  // Reset lock if parent marks isSubmitting false
+  useEffect(() => {
+    if (!isSubmitting) {
+      lockRef.locked = false
+    }
+  }, [isSubmitting, lockRef])
 
   // Fetch category list for the dropdown
   useEffect(() => {
@@ -111,8 +119,8 @@ export default function ProductForm({
   const handleSubmit = (e) => {
     e.preventDefault()
 
-    // Prevent duplicate submission if already processing
-    if (isSubmitting) return
+    // Prevent duplicate submission if already processing or locked
+    if (isSubmitting || lockRef.locked) return
 
     // Run full validation across all fields
     const newErrors = {
@@ -146,6 +154,7 @@ export default function ProductForm({
       thumbnail: formData.thumbnail.trim() || 'https://cdn.dummyjson.com/products/images/beauty/Essence%20Mascara%20Lash%20Princess/thumbnail.png',
     }
 
+    lockRef.locked = true
     onSubmit(submissionPayload)
   }
 
